@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Share Your Location</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+  }
+  .card {
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 16px;
+    padding: 40px 30px;
+    max-width: 420px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+  .icon { font-size: 48px; margin-bottom: 10px; }
+  h1 { font-size: 22px; margin: 10px 0; }
+  p { color: #d8e3ff; font-size: 14px; line-height: 1.5; }
+  button {
+    margin-top: 20px;
+    padding: 14px 28px;
+    font-size: 16px;
+    border: none;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #1e3c72;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+  }
+  button:hover { transform: translateY(-2px); }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  #status {
+    margin-top: 18px;
+    font-size: 14px;
+    min-height: 20px;
+  }
+  .success { color: #7CFC9A; }
+  .error { color: #FF8A8A; }
+  input {
+    margin-top: 14px;
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    font-size: 14px;
+  }
+  input::placeholder { color: #cfd9f5; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="icon">📍</div>
+  <h1>Location Sharing Request</h1>
+  <p>This page needs access to your device's location. Your browser will ask
+     for permission — nothing is sent unless you click "Allow".</p>
+
+  <input type="text" id="nameInput" placeholder="Your name (optional)" />
+  <br />
+  <button id="shareBtn">Allow &amp; Share Location</button>
+  <div id="status"></div>
+</div>
+
+<script>
+  const btn = document.getElementById('shareBtn');
+  const status = document.getElementById('status');
+  const nameInput = document.getElementById('nameInput');
+
+  btn.addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      status.textContent = 'Geolocation is not supported by this browser.';
+      status.className = 'error';
+      return;
+    }
+
+    btn.disabled = true;
+    status.textContent = 'Requesting permission...';
+    status.className = '';
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
+        status.textContent = `Location captured. Sending...`;
+
+        try {
+          const res = await fetch('/api/location', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              latitude,
+              longitude,
+              accuracy,
+              name: nameInput.value.trim()
+            })
+          });
+          const data = await res.json();
+          if (data.success) {
+            status.textContent = `✅ Location shared successfully! (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`;
+            status.className = 'success';
+          } else {
+            throw new Error(data.error || 'Unknown error');
+          }
+        } catch (err) {
+          status.textContent = '❌ Failed to send location: ' + err.message;
+          status.className = 'error';
+          btn.disabled = false;
+        }
+      },
+      (err) => {
+        status.textContent = '❌ Permission denied or unavailable: ' + err.message;
+        status.className = 'error';
+        btn.disabled = false;
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  });
+</script>
+
+</body>
+</html>
