@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Location Dashboard</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+  }
+  header {
+    padding: 16px 24px;
+    background: #111827;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #1f2937;
+  }
+  header h1 { font-size: 18px; margin: 0; }
+  header button {
+    background: #ef4444;
+    color: #fff;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  #map { height: 60vh; width: 100%; }
+  #list {
+    padding: 16px 24px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 10px;
+    border-bottom: 1px solid #1f2937;
+  }
+  th { color: #94a3b8; font-weight: 600; }
+  tr:hover { background: #1e293b; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📍 Location Dashboard</h1>
+  <button onclick="clearAll()">Clear All Data</button>
+</header>
+
+<div id="map"></div>
+
+<div id="list">
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Latitude</th><th>Longitude</th><th>Accuracy (m)</th><th>Time</th></tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+  const map = L.map('map').setView([30.3753, 69.3451], 5); // default center: Pakistan
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  let markers = [];
+
+  async function loadLocations() {
+    const res = await fetch('/api/locations');
+    const data = await res.json();
+
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+
+    if (data.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="color:#64748b;">No locations received yet.</td></tr>';
+      return;
+    }
+
+    data.slice().reverse().forEach(loc => {
+      const marker = L.marker([loc.latitude, loc.longitude]).addTo(map);
+      marker.bindPopup(`<b>${loc.name}</b><br>${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}<br>${new Date(loc.timestamp).toLocaleString()}`);
+      markers.push(marker);
+
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${loc.name}</td>
+        <td>${loc.latitude.toFixed(5)}</td>
+        <td>${loc.longitude.toFixed(5)}</td>
+        <td>${loc.accuracy ? Math.round(loc.accuracy) : '-'}</td>
+        <td>${new Date(loc.timestamp).toLocaleString()}</td>
+      `;
+      tbody.appendChild(row);
+    });
+
+    // Center map on the most recent location
+    const last = data[data.length - 1];
+    map.setView([last.latitude, last.longitude], 13);
+  }
+
+  async function clearAll() {
+    if (!confirm('Clear all stored location data?')) return;
+    await fetch('/api/locations', { method: 'DELETE' });
+    loadLocations();
+  }
+
+  loadLocations();
+  setInterval(loadLocations, 5000); // auto-refresh every 5s
+</script>
+
+</body>
+</html>
